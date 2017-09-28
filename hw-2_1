@@ -1,0 +1,117 @@
+import numpy as np
+import pandas as pd
+from scipy import misc
+from matplotlib import pylab as plt
+import matplotlib.cm as cm
+from sklearn import decomposition
+from sklearn.utils.extmath import randomized_svd
+from sklearn.decomposition import PCA
+from sklearn.decomposition import TruncatedSVD
+from sklearn.linear_model import LogisticRegression
+
+# train data
+train_labels, train_data = [], []
+for line in open('faces/train.txt'):
+    im = misc.imread(line.strip().split()[0])
+    train_data.append(im.reshape(2500,))
+    train_labels.append(line.strip().split()[1])
+train_data, train_labels = np.array(train_data, dtype=float), np.array(train_labels, dtype=int)
+
+# print(train_data.shape, train_labels.shape)
+
+# test data
+test_labels, test_data = [], []
+for line in open('faces/test.txt'):
+    im = misc.imread(line.strip().split()[0])
+    test_data.append(im.reshape(2500,))
+    test_labels.append(line.strip().split()[1])
+test_data, test_labels = np.array(test_data, dtype=float), np.array(test_labels, dtype=int)
+
+plt.imshow(train_data[3].reshape(50,50), cmap = cm.Greys_r)
+plt.show()
+
+plt.imshow(test_data[10].reshape(50,50), cmap = cm.Greys_r)
+plt.show()
+
+# average face
+# print(train_data[0])
+temp = train_data.sum(axis=0)
+# print(temp)
+avg_face = temp/540
+# print(avg_face)
+plt.imshow(avg_face.reshape(50,50), cmap = cm.Greys_r)
+plt.show()
+
+print(avg_face)
+print(train_data[0])
+
+# subtract avg face from each face
+# print(train_data[0])
+# print(avg_face)
+new_train_data = train_data - avg_face
+new_test_data = test_data - avg_face
+plt.imshow(new_train_data[3].reshape(50,50), cmap = cm.Greys_r)
+plt.show()
+
+plt.imshow(new_test_data[10].reshape(50,50), cmap = cm.Greys_r)
+plt.show()
+
+# svd
+# pca = decomposition.PCA()
+# u = pca.fit_transform(new_train_data)
+# sigma = (pca.explained_variance_ratio_)
+# vt = pca.components_
+# print(pca.explained_variance_ratio_.sum())
+
+U, Sigma, VT = np.linalg.svd(train_data, full_matrices=True)
+
+first_ten = VT[0:10]
+
+for elem in first_ten:
+    plt.imshow(elem.reshape(50,50), cmap = cm.Greys_r)
+    plt.show()
+
+# low rank
+error = []
+Sigma = np.diag(Sigma)
+
+for i in range(1, 201):
+    US = np.dot(U[:,:i], Sigma[:i,:i])
+    US_VT = np.dot(US, VT[:i,:])
+    temp = train_data - US_VT
+    
+    
+    error_norm = np.linalg.norm(temp, 'fro')
+    error.append(error_norm)
+    
+plt.figure()
+plt.plot(range(1,201), error)
+plt.show()
+
+# eigenface
+
+def r_dim(data, r):
+    return np.dot(data, VT[:r,:].transpose())
+
+# face recognition
+
+class_accuracy = []
+F_test = r_dim(test_data, 10)
+F = r_dim(train_data, 10)
+
+logist_r = LogisticRegression(multi_class="ovr")
+logist_r.fit(F, train_labels)
+print("Model accuracy is: " + 
+      str(logist_r.score(F_test, test_labels)))
+
+for i in range(1, 201):
+    F_test = r_dim(test_data, i)
+    F = r_dim(train_data, i)
+    logist_r.fit(F, train_labels)
+    class_accuracy.append(logist_r.score(F_test, test_labels))
+    
+plt.figure()
+plt.plot(range(1,201), class_accuracy)
+plt.show()
+
+
