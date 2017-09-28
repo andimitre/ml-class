@@ -1,0 +1,113 @@
+hw-2
+
+# a, b
+import numpy as np
+import pandas as pd
+from matplotlib import pylab as plt
+
+train_data = pd.read_json("train.json")
+test_data = pd.read_json("test.json")
+np_train = np.array(train_data)
+np_test = np.array(test_data)
+
+cuisines = np.array(train_data.cuisine)
+cuisine = train_data.cuisine.drop_duplicates().count()
+dishes = train_data.id.value_counts().sum()
+final_ingredients = []
+for index, row in train_data.iterrows():
+    for elem in row.ingredients:
+        if elem not in final_ingredients:
+            final_ingredients.append(elem)
+            
+ingredients = len(final_ingredients)
+
+print("Number of dishes: " + str(dishes))
+print("Number of cuisines: " + str(cuisine))
+print("Number of unique ingredients: " + str(ingredients))
+
+
+# c
+
+# grab ids
+# grab ingredients and convert to row matrix with 1,0
+
+num_train = len(train_data)
+num_test = len(test_data)
+
+matrix = np.empty([num_train, ingredients])
+test_matrix = np.empty([num_test, ingredients])
+
+train_vector = np.zeros(ingredients)
+test_vector = np.zeros(ingredients)
+
+
+
+for i in range(0, num_train):
+    ingredient_list = np_train[i][2]
+    
+    for elem in ingredient_list:
+        index = final_ingredients.index(elem)
+        train_vector[index] = 1
+    matrix[i] = train_vector
+    train_vector = np.zeros(ingredients)
+        
+        
+for n in range(0, num_test):
+    ingredient_list2 = np_test[n][1] 
+    
+    for elems in ingredient_list2:
+        if elems in final_ingredients:
+            index2 = final_ingredients.index(elems)
+            test_vector[index2] = 1
+    test_matrix[n] = test_vector
+    test_vector = np.zeros(ingredients)
+    
+    
+    # d, e
+from sklearn.naive_bayes import GaussianNB
+from sklearn.naive_bayes import BernoulliNB
+from sklearn.cross_validation import KFold
+from sklearn.linear_model import LogisticRegression
+
+bern_score = 0
+gauss_score = 0
+logg_score = 0
+
+clf = GaussianNB()
+clfb = BernoulliNB()
+clfr = LogisticRegression()
+kf = KFold(num_train, 3)
+
+for train_idx, test_idx in kf:
+    X_train = matrix[train_idx]
+    X_test = matrix[test_idx]
+    y_train = cuisines[train_idx]
+    y_test = cuisines[test_idx]
+    clf.fit(X_train, y_train)
+    clfb.fit(X_train, y_train)
+    clfr.fit(X_train, y_train)
+    gauss_score += clf.score(X_test, y_test)
+    bern_score += clfb.score(X_test, y_test)
+    logg_score += clfr.score(X_test, y_test)
+    print("Gaussian score: " + str(clf.score(X_test, y_test)))
+    print("Bernoulli score: " + str(clfb.score(X_test, y_test)))
+    print("Logistic regression score: " + str(clfr.score(X_test, y_test)))
+    
+gauss_avg = gauss_score/3
+bern_avg = bern_score/3
+logg_avg = logg_score/3
+    
+print("Gaussian avg: " + str(gauss_avg))
+print("Bernoulli avg: " + str(bern_avg))
+print("Logistic avg: " + str(logg_avg))
+
+
+output = clfr.predict(test_matrix)
+
+ids = []
+for elem in range(0, num_test):
+    ids.append(np_test[elem][0])
+    
+result = pd.DataFrame({'id': ids, 'cuisine': output})
+result = result[['id', 'cuisine']]
+result.to_csv("submission.csv", index=False, index_label=False)
